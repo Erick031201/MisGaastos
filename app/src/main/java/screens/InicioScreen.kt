@@ -47,6 +47,9 @@ fun InicioScreen(
     var categoria by remember { mutableStateOf("") }
     var monto by remember { mutableStateOf("") }
 
+    // Guarda el gasto que estamos editando.
+    var gastoEditando by remember { mutableStateOf<Gasto?>(null) }
+
     val total = gastos.sumOf { it.monto }
 
     Scaffold(
@@ -104,7 +107,11 @@ fun InicioScreen(
 
             item {
                 Text(
-                    text = "Registrar gasto",
+                    text = if (gastoEditando == null) {
+                        "Registrar gasto"
+                    } else {
+                        "Editar gasto"
+                    },
                     style = MaterialTheme.typography.titleLarge
                 )
             }
@@ -170,28 +177,69 @@ fun InicioScreen(
                             montoDouble > 0
                         ) {
 
-                            val fechaActual = SimpleDateFormat(
-                                "dd/MM/yyyy",
-                                Locale.getDefault()
-                            ).format(Date())
+                            if (gastoEditando == null) {
 
-                            val nuevoGasto = Gasto(
-                                descripcion = descripcion,
-                                categoria = categoria,
-                                monto = montoDouble,
-                                fecha = fechaActual
-                            )
+                                // Crear nuevo gasto
+                                val fechaActual = SimpleDateFormat(
+                                    "dd/MM/yyyy",
+                                    Locale.getDefault()
+                                ).format(Date())
 
-                            viewModel.insertarGasto(nuevoGasto)
+                                val nuevoGasto = Gasto(
+                                    descripcion = descripcion,
+                                    categoria = categoria,
+                                    monto = montoDouble,
+                                    fecha = fechaActual
+                                )
 
+                                viewModel.insertarGasto(nuevoGasto)
+
+                            } else {
+
+                                // Actualizar gasto existente
+                                val gastoActualizado = gastoEditando!!.copy(
+                                    descripcion = descripcion,
+                                    categoria = categoria,
+                                    monto = montoDouble
+                                )
+
+                                viewModel.actualizarGasto(gastoActualizado)
+                            }
+
+                            // Limpiar formulario
                             descripcion = ""
                             categoria = ""
                             monto = ""
+                            gastoEditando = null
                         }
                     },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("GUARDAR GASTO")
+                    Text(
+                        if (gastoEditando == null) {
+                            "GUARDAR GASTO"
+                        } else {
+                            "ACTUALIZAR GASTO"
+                        }
+                    )
+                }
+            }
+
+            // Botón para cancelar una edición
+            if (gastoEditando != null) {
+
+                item {
+                    OutlinedButton(
+                        onClick = {
+                            descripcion = ""
+                            categoria = ""
+                            monto = ""
+                            gastoEditando = null
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("CANCELAR EDICIÓN")
+                    }
                 }
             }
 
@@ -222,8 +270,27 @@ fun InicioScreen(
 
                     GastoItem(
                         gasto = gasto,
+
+                        onEditar = {
+
+                            // Cargar datos del gasto seleccionado
+                            gastoEditando = gasto
+                            descripcion = gasto.descripcion
+                            categoria = gasto.categoria
+                            monto = gasto.monto.toString()
+                        },
+
                         onEliminar = {
                             viewModel.eliminarGasto(gasto)
+
+                            // Si estábamos editando este gasto,
+                            // cancelamos la edición.
+                            if (gastoEditando?.id == gasto.id) {
+                                descripcion = ""
+                                categoria = ""
+                                monto = ""
+                                gastoEditando = null
+                            }
                         }
                     )
                 }
@@ -235,6 +302,7 @@ fun InicioScreen(
 @Composable
 fun GastoItem(
     gasto: Gasto,
+    onEditar: () -> Unit,
     onEliminar: () -> Unit
 ) {
     Card(
@@ -280,6 +348,17 @@ fun GastoItem(
 
             Spacer(modifier = Modifier.height(8.dp))
 
+            // Botón Editar
+            OutlinedButton(
+                onClick = onEditar,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Editar")
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            // Botón Eliminar
             OutlinedButton(
                 onClick = onEliminar,
                 modifier = Modifier.fillMaxWidth()
