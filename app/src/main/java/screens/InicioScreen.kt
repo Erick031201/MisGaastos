@@ -15,6 +15,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -47,10 +49,31 @@ fun InicioScreen(
     var categoria by remember { mutableStateOf("") }
     var monto by remember { mutableStateOf("") }
 
-    // Guarda el gasto que estamos editando.
     var gastoEditando by remember { mutableStateOf<Gasto?>(null) }
 
+    var categoriaExpandida by remember { mutableStateOf(false) }
+
+    val categorias = listOf(
+        "Comida",
+        "Transporte",
+        "Hogar",
+        "Salud",
+        "Educación",
+        "Entretenimiento",
+        "Compras",
+        "Otros"
+    )
+
     val total = gastos.sumOf { it.monto }
+
+    // Agrupar gastos por categoría y sumar sus montos
+    val resumenCategorias = gastos
+        .groupBy { it.categoria }
+        .mapValues { (_, gastosCategoria) ->
+            gastosCategoria.sumOf { it.monto }
+        }
+        .toList()
+        .sortedByDescending { it.second }
 
     Scaffold(
         modifier = Modifier.fillMaxSize()
@@ -64,6 +87,7 @@ fun InicioScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
 
+            // ENCABEZADO
             item {
                 Text(
                     text = "Mis Gastos",
@@ -78,6 +102,7 @@ fun InicioScreen(
                 )
             }
 
+            // TOTAL
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -105,7 +130,62 @@ fun InicioScreen(
                 }
             }
 
+            // RESUMEN POR CATEGORÍA
             item {
+                Text(
+                    text = "Resumen por categoría",
+                    style = MaterialTheme.typography.titleLarge
+                )
+            }
+
+            if (resumenCategorias.isEmpty()) {
+
+                item {
+                    Text(
+                        text = "Todavía no hay datos para mostrar.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+
+            } else {
+
+                items(
+                    items = resumenCategorias,
+                    key = { it.first }
+                ) { resumen ->
+
+                    val nombreCategoria = resumen.first
+                    val totalCategoria = resumen.second
+
+                    Card(
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+
+                            Text(
+                                text = nombreCategoria,
+                                modifier = Modifier.weight(1f),
+                                style = MaterialTheme.typography.titleMedium
+                            )
+
+                            Text(
+                                text = "$%.2f".format(totalCategoria),
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                        }
+                    }
+                }
+            }
+
+            // FORMULARIO
+            item {
+                Spacer(modifier = Modifier.height(8.dp))
+
                 Text(
                     text = if (gastoEditando == null) {
                         "Registrar gasto"
@@ -131,19 +211,48 @@ fun InicioScreen(
                 )
             }
 
+            // SELECTOR DE CATEGORÍA
             item {
-                OutlinedTextField(
-                    value = categoria,
-                    onValueChange = { categoria = it },
-                    label = {
-                        Text("Categoría")
-                    },
-                    placeholder = {
-                        Text("Ej. Comida")
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
+                Column(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+
+                    OutlinedButton(
+                        onClick = {
+                            categoriaExpandida = true
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = if (categoria.isBlank()) {
+                                "Seleccionar categoría"
+                            } else {
+                                categoria
+                            }
+                        )
+                    }
+
+                    DropdownMenu(
+                        expanded = categoriaExpandida,
+                        onDismissRequest = {
+                            categoriaExpandida = false
+                        }
+                    ) {
+
+                        categorias.forEach { opcion ->
+
+                            DropdownMenuItem(
+                                text = {
+                                    Text(opcion)
+                                },
+                                onClick = {
+                                    categoria = opcion
+                                    categoriaExpandida = false
+                                }
+                            )
+                        }
+                    }
+                }
             }
 
             item {
@@ -164,6 +273,7 @@ fun InicioScreen(
                 )
             }
 
+            // GUARDAR / ACTUALIZAR
             item {
                 Button(
                     onClick = {
@@ -179,7 +289,6 @@ fun InicioScreen(
 
                             if (gastoEditando == null) {
 
-                                // Crear nuevo gasto
                                 val fechaActual = SimpleDateFormat(
                                     "dd/MM/yyyy",
                                     Locale.getDefault()
@@ -196,7 +305,6 @@ fun InicioScreen(
 
                             } else {
 
-                                // Actualizar gasto existente
                                 val gastoActualizado = gastoEditando!!.copy(
                                     descripcion = descripcion,
                                     categoria = categoria,
@@ -206,7 +314,6 @@ fun InicioScreen(
                                 viewModel.actualizarGasto(gastoActualizado)
                             }
 
-                            // Limpiar formulario
                             descripcion = ""
                             categoria = ""
                             monto = ""
@@ -225,7 +332,7 @@ fun InicioScreen(
                 }
             }
 
-            // Botón para cancelar una edición
+            // CANCELAR EDICIÓN
             if (gastoEditando != null) {
 
                 item {
@@ -243,6 +350,7 @@ fun InicioScreen(
                 }
             }
 
+            // HISTORIAL
             item {
                 Spacer(modifier = Modifier.height(8.dp))
 
@@ -272,8 +380,6 @@ fun InicioScreen(
                         gasto = gasto,
 
                         onEditar = {
-
-                            // Cargar datos del gasto seleccionado
                             gastoEditando = gasto
                             descripcion = gasto.descripcion
                             categoria = gasto.categoria
@@ -283,8 +389,6 @@ fun InicioScreen(
                         onEliminar = {
                             viewModel.eliminarGasto(gasto)
 
-                            // Si estábamos editando este gasto,
-                            // cancelamos la edición.
                             if (gastoEditando?.id == gasto.id) {
                                 descripcion = ""
                                 categoria = ""
@@ -348,7 +452,6 @@ fun GastoItem(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Botón Editar
             OutlinedButton(
                 onClick = onEditar,
                 modifier = Modifier.fillMaxWidth()
@@ -358,7 +461,6 @@ fun GastoItem(
 
             Spacer(modifier = Modifier.height(6.dp))
 
-            // Botón Eliminar
             OutlinedButton(
                 onClick = onEliminar,
                 modifier = Modifier.fillMaxWidth()
