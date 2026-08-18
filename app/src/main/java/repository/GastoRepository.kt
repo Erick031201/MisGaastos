@@ -16,6 +16,10 @@ class GastoRepository(
         gastoDao.insertar(gasto)
     }
 
+    suspend fun actualizar(gasto: Gasto) {
+        gastoDao.actualizar(gasto)
+    }
+
     suspend fun eliminar(gasto: Gasto) {
         gastoDao.eliminar(gasto)
     }

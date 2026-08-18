@@ -27,6 +27,12 @@ class GastoViewModel(
         }
     }
 
+    fun actualizarGasto(gasto: Gasto) {
+        viewModelScope.launch {
+            repository.actualizar(gasto)
+        }
+    }
+
     fun eliminarGasto(gasto: Gasto) {
         viewModelScope.launch {
             repository.eliminar(gasto)
