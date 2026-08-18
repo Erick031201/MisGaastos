@@ -21,12 +21,16 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,6 +39,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import com.example.misgastos.data.local.Gasto
 import com.example.misgastos.viewmodel.GastoViewModel
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -53,6 +58,9 @@ fun InicioScreen(
 
     var categoriaExpandida by remember { mutableStateOf(false) }
 
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+
     val categorias = listOf(
         "Comida",
         "Transporte",
@@ -66,7 +74,6 @@ fun InicioScreen(
 
     val total = gastos.sumOf { it.monto }
 
-    // Agrupar gastos por categoría y sumar sus montos
     val resumenCategorias = gastos
         .groupBy { it.categoria }
         .mapValues { (_, gastosCategoria) ->
@@ -76,7 +83,10 @@ fun InicioScreen(
         .sortedByDescending { it.second }
 
     Scaffold(
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier.fillMaxSize(),
+        snackbarHost = {
+            SnackbarHost(hostState = snackbarHostState)
+        }
     ) { innerPadding ->
 
         LazyColumn(
@@ -87,7 +97,6 @@ fun InicioScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
 
-            // ENCABEZADO
             item {
                 Text(
                     text = "Mis Gastos",
@@ -102,7 +111,6 @@ fun InicioScreen(
                 )
             }
 
-            // TOTAL
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -130,7 +138,6 @@ fun InicioScreen(
                 }
             }
 
-            // RESUMEN POR CATEGORÍA
             item {
                 Text(
                     text = "Resumen por categoría",
@@ -154,9 +161,6 @@ fun InicioScreen(
                     key = { it.first }
                 ) { resumen ->
 
-                    val nombreCategoria = resumen.first
-                    val totalCategoria = resumen.second
-
                     Card(
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -168,13 +172,13 @@ fun InicioScreen(
                         ) {
 
                             Text(
-                                text = nombreCategoria,
+                                text = resumen.first,
                                 modifier = Modifier.weight(1f),
                                 style = MaterialTheme.typography.titleMedium
                             )
 
                             Text(
-                                text = "$%.2f".format(totalCategoria),
+                                text = "$%.2f".format(resumen.second),
                                 style = MaterialTheme.typography.titleMedium
                             )
                         }
@@ -182,7 +186,6 @@ fun InicioScreen(
                 }
             }
 
-            // FORMULARIO
             item {
                 Spacer(modifier = Modifier.height(8.dp))
 
@@ -211,7 +214,6 @@ fun InicioScreen(
                 )
             }
 
-            // SELECTOR DE CATEGORÍA
             item {
                 Column(
                     modifier = Modifier.fillMaxWidth()
@@ -273,51 +275,99 @@ fun InicioScreen(
                 )
             }
 
-            // GUARDAR / ACTUALIZAR
             item {
                 Button(
                     onClick = {
 
                         val montoDouble = monto.toDoubleOrNull()
 
-                        if (
-                            descripcion.isNotBlank() &&
-                            categoria.isNotBlank() &&
-                            montoDouble != null &&
-                            montoDouble > 0
-                        ) {
-
-                            if (gastoEditando == null) {
-
-                                val fechaActual = SimpleDateFormat(
-                                    "dd/MM/yyyy",
-                                    Locale.getDefault()
-                                ).format(Date())
-
-                                val nuevoGasto = Gasto(
-                                    descripcion = descripcion,
-                                    categoria = categoria,
-                                    monto = montoDouble,
-                                    fecha = fechaActual
-                                )
-
-                                viewModel.insertarGasto(nuevoGasto)
-
-                            } else {
-
-                                val gastoActualizado = gastoEditando!!.copy(
-                                    descripcion = descripcion,
-                                    categoria = categoria,
-                                    monto = montoDouble
-                                )
-
-                                viewModel.actualizarGasto(gastoActualizado)
+                        when {
+                            descripcion.isBlank() -> {
+                                scope.launch {
+                                    snackbarHostState.showSnackbar(
+                                        "Completa la descripción"
+                                    )
+                                }
                             }
 
-                            descripcion = ""
-                            categoria = ""
-                            monto = ""
-                            gastoEditando = null
+                            categoria.isBlank() -> {
+                                scope.launch {
+                                    snackbarHostState.showSnackbar(
+                                        "Selecciona una categoría"
+                                    )
+                                }
+                            }
+
+                            monto.isBlank() -> {
+                                scope.launch {
+                                    snackbarHostState.showSnackbar(
+                                        "Ingresa un monto"
+                                    )
+                                }
+                            }
+
+                            montoDouble == null -> {
+                                scope.launch {
+                                    snackbarHostState.showSnackbar(
+                                        "El monto debe ser un número válido"
+                                    )
+                                }
+                            }
+
+                            montoDouble <= 0 -> {
+                                scope.launch {
+                                    snackbarHostState.showSnackbar(
+                                        "El monto debe ser mayor a 0"
+                                    )
+                                }
+                            }
+
+                            else -> {
+
+                                if (gastoEditando == null) {
+
+                                    val fechaActual = SimpleDateFormat(
+                                        "dd/MM/yyyy",
+                                        Locale.getDefault()
+                                    ).format(Date())
+
+                                    val nuevoGasto = Gasto(
+                                        descripcion = descripcion.trim(),
+                                        categoria = categoria,
+                                        monto = montoDouble,
+                                        fecha = fechaActual
+                                    )
+
+                                    viewModel.insertarGasto(nuevoGasto)
+
+                                    scope.launch {
+                                        snackbarHostState.showSnackbar(
+                                            "Gasto registrado correctamente"
+                                        )
+                                    }
+
+                                } else {
+
+                                    val gastoActualizado = gastoEditando!!.copy(
+                                        descripcion = descripcion.trim(),
+                                        categoria = categoria,
+                                        monto = montoDouble
+                                    )
+
+                                    viewModel.actualizarGasto(gastoActualizado)
+
+                                    scope.launch {
+                                        snackbarHostState.showSnackbar(
+                                            "Gasto actualizado correctamente"
+                                        )
+                                    }
+                                }
+
+                                descripcion = ""
+                                categoria = ""
+                                monto = ""
+                                gastoEditando = null
+                            }
                         }
                     },
                     modifier = Modifier.fillMaxWidth()
@@ -332,7 +382,6 @@ fun InicioScreen(
                 }
             }
 
-            // CANCELAR EDICIÓN
             if (gastoEditando != null) {
 
                 item {
@@ -342,6 +391,12 @@ fun InicioScreen(
                             categoria = ""
                             monto = ""
                             gastoEditando = null
+
+                            scope.launch {
+                                snackbarHostState.showSnackbar(
+                                    "Edición cancelada"
+                                )
+                            }
                         },
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -350,7 +405,6 @@ fun InicioScreen(
                 }
             }
 
-            // HISTORIAL
             item {
                 Spacer(modifier = Modifier.height(8.dp))
 
@@ -394,6 +448,12 @@ fun InicioScreen(
                                 categoria = ""
                                 monto = ""
                                 gastoEditando = null
+                            }
+
+                            scope.launch {
+                                snackbarHostState.showSnackbar(
+                                    "Gasto eliminado correctamente"
+                                )
                             }
                         }
                     )
