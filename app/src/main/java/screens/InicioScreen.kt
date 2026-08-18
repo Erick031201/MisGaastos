@@ -25,7 +25,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -74,13 +73,32 @@ fun InicioScreen(
 
     val total = gastos.sumOf { it.monto }
 
-    val resumenCategorias = gastos
-        .groupBy { it.categoria }
-        .mapValues { (_, gastosCategoria) ->
-            gastosCategoria.sumOf { it.monto }
+    /*
+     * Resumen por categoría.
+     *
+     * Se compara ignorando mayúsculas y minúsculas para que:
+     *
+     * "Comida"
+     * "comida"
+     * "COMIDA"
+     *
+     * sean consideradas la misma categoría.
+     */
+    val resumenCategorias = categorias.mapNotNull { categoriaActual ->
+
+        val gastosCategoria = gastos.filter {
+            it.categoria.trim().equals(
+                categoriaActual,
+                ignoreCase = true
+            )
         }
-        .toList()
-        .sortedByDescending { it.second }
+
+        if (gastosCategoria.isNotEmpty()) {
+            categoriaActual to gastosCategoria.sumOf { it.monto }
+        } else {
+            null
+        }
+    }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
